@@ -97,6 +97,13 @@ namespace ZaurzoUtil
 
                 try
                 {
+                    // Safegaurd
+                    if (AssetDatabase.GetMainAssetTypeAtPath(asset.path) != asset.type)
+                    {
+                        Debug.LogError($"Cannot auto-create ScriptableObject: A different type of asset already exists at '{asset.path}'");
+                        return;
+                    }
+
                     string directoryPath = Path.GetDirectoryName(asset.path);
 
                     if (!Directory.Exists(directoryPath))
