@@ -108,11 +108,11 @@ namespace ZaurzoUtil
                     if (currentAssetType != null && currentAssetType != asset.type)
                     {
                         Debug.LogError(
-                            "Cannot auto-create ScriptableObject: " +
+                            "Could not auto-create scriptable object asset: " +
                             $"A different type of asset already exists at '{asset.path}'"
                         );
                    
-                        return;
+                        continue;
                     }
 
                     string directoryPath = Path.GetDirectoryName(asset.path);
@@ -129,7 +129,7 @@ namespace ZaurzoUtil
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError(e.Message);
+                    Debug.LogError($"Could not auto-create scriptable object asset: {e.Message}");
                 }
             }
 
