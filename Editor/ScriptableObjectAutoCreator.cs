@@ -82,7 +82,10 @@ namespace ZaurzoUtil
 
                     if (type.GetCustomAttribute<CreateAssetMenuAttribute>() != null && !existingAssets.Contains(type))
                     {
-                        Debug.LogWarning($"ScriptableObject ({type.Name}) with EnsureAssetExists attribute also has CreateAssetMenu attribute. EnsureAssetExists attribute will be disabled in this case.");
+                        Debug.LogWarning(
+                            $"ScriptableObject ({type.Name}) with EnsureAssetExists attribute also has CreateAssetMenu attribute." +
+                            "Auto-creation will be disabled in this case."
+                        );
                     }
                 }
             }
@@ -97,10 +100,13 @@ namespace ZaurzoUtil
 
                 try
                 {
+                    Type currentAssetType = AssetDatabase.GetMainAssetTypeAtPath(asset.path);
+                    
                     // Safegaurd
-                    if (AssetDatabase.GetMainAssetTypeAtPath(asset.path) != asset.type)
+                    if (currentAssetType != null && currentAssetType != asset.type)
                     {
                         Debug.LogError($"Cannot auto-create ScriptableObject: A different type of asset already exists at '{asset.path}'");
+                   
                         return;
                     }
 
