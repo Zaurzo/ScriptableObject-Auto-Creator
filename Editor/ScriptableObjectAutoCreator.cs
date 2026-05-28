@@ -1,105 +1,175 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
-[InitializeOnLoad]
-public class ScriptableObjectAutoCreator : UnityEditor.AssetModificationProcessor
+namespace ZaurzoUtil
 {
-    private static List<SObjectAsset> sObjectAssets = new List<SObjectAsset>();
-
-    struct SObjectAsset
+    [InitializeOnLoad]
+    public class ScriptableObjectAutoCreator : UnityEditor.AssetModificationProcessor
     {
-        public Type type;
-        
-        public string folder;
-        public string name;
-        public string path;
-    }
+        private static List<AssetInfo> cachedAssetInfo = new List<AssetInfo>();
 
-    static ScriptableObjectAutoCreator()
-    {
-        sObjectAssets.Clear();
-        
-        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+        private readonly struct AssetInfo
         {
-            foreach (Type type in assembly.GetTypes())
-            {
-                if (!type.IsSubclassOf(typeof(ScriptableObject))) continue;
-                if (type.GetCustomAttribute<CreateAssetMenuAttribute>() != null) continue;
-                
-                var attr = type.GetCustomAttribute<EnsureAssetExistsAttribute>();
-                if (attr == null) continue;
+            public readonly Type type;
+            
+            public readonly string path;
+            public readonly bool movable;
 
-                var asset = new SObjectAsset()
+            public AssetInfo(Type type, string path, bool movable)
+            {
+                this.type = type;
+                this.path = path;
+                this.movable = movable;
+            }
+        }
+
+        static ScriptableObjectAutoCreator()
+        {
+            cachedAssetInfo.Clear();
+
+            var existingAssets = new HashSet<Type>();
+            {
+                string[] assets = AssetDatabase.FindAssets(
+                    "t:scriptableobject", 
+                    new string[] { "Assets" }
+                );
+
+                foreach (string guid in assets)
                 {
-                    type = type,
-                    folder = $"Assets/{attr.AssetFolder}",
-                    name = attr.AssetName ?? type.Name
-                };
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    
+                    Type type = AssetDatabase.GetMainAssetTypeAtPath(path);
 
-                asset.path = $"{asset.folder}/{asset.name}.asset";
-
-                sObjectAssets.Add(asset);
+                    if (type != null && !existingAssets.Contains(type))
+                    {
+                        existingAssets.Add(type);
+                    }
+                }
             }
-        }
-
-        if (sObjectAssets.Count < 1) return;
-
-        bool refresh = false;
-
-        foreach (SObjectAsset asset in sObjectAssets)
-        {
-            if (AssetExists(asset.name, asset.folder)) continue;
-
-            try
+            
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                ScriptableObject obj = ScriptableObject.CreateInstance(asset.type);
-                AssetDatabase.CreateAsset(obj, asset.path);
+                foreach (Type type in assembly.GetTypes())
+                {
+                    if (!type.IsSubclassOf(typeof(ScriptableObject))) continue;
 
-                refresh = true;
+                    var attr = type.GetCustomAttribute<EnsureAssetExistsAttribute>();
+                    if (attr == null) continue;
+
+                    string assetFolder = attr.initialFolder;
+                    string assetName = attr.initialName ?? type.Name;
+
+                    if (assetFolder != null)
+                    {
+                        assetFolder = $"Assets/{assetFolder}";
+                    }
+                    else
+                    {
+                        assetFolder = "Assets";
+                    }
+
+                    var assetInfo = new AssetInfo(
+                        type, 
+                        $"{assetFolder}/{assetName}.asset",
+                        attr.movable
+                    );
+
+                    cachedAssetInfo.Add(assetInfo);
+
+                    if (type.GetCustomAttribute<CreateAssetMenuAttribute>() != null && !existingAssets.Contains(type))
+                    {
+                        Debug.LogWarning($"ScriptableObject ({type.Name}) with EnsureAssetExists attribute also has CreateAssetMenu attribute. EnsureAssetExists attribute will be disabled in this case.");
+                    }
+                }
             }
-            catch (Exception e)
+
+            if (cachedAssetInfo.Count < 1) return;
+
+            bool refresh = false;
+
+            foreach (AssetInfo asset in cachedAssetInfo)
             {
-                Debug.LogError(e.Message);
+                if (existingAssets.Contains(asset.type)) continue;
+
+                try
+                {
+                    string directoryPath = Path.GetDirectoryName(asset.path);
+
+                    if (!Directory.Exists(directoryPath))
+                    {
+                        Directory.CreateDirectory(directoryPath);
+                    }
+
+                    ScriptableObject obj = ScriptableObject.CreateInstance(asset.type);
+                    AssetDatabase.CreateAsset(obj, asset.path);
+
+                    refresh = true;
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError(e.Message);
+                }
+            }
+
+            if (refresh)
+            {
+                AssetDatabase.Refresh();
             }
         }
 
-        if (refresh)
+        private static bool TryGetAssetInfo(string assetPath, out AssetInfo? assetInfo)
         {
-            AssetDatabase.Refresh();
-        }
-    }
+            Type type = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
 
-    // Prevent ScriptableObjects that have the EnsureAssetExists attribute from being deleted
-    private static AssetDeleteResult OnWillDeleteAsset(string assetPath, RemoveAssetOptions options)
-    {
-        foreach (SObjectAsset asset in sObjectAssets)
-        {
-            if (asset.path != assetPath) continue;
+            foreach (AssetInfo info in cachedAssetInfo)
+            {
+                if (type == info.type)
+                {
+                    assetInfo = info;
 
-            EditorUtility.DisplayDialog(
-                "Deletion Blocked",
-                "This scriptable object may not be deleted as it is protected by the EnsureAssetExists attribute.",
-                "Ok"
-            );
+                    return true;
+                }
+            }
 
-            return AssetDeleteResult.FailedDelete;
+            assetInfo = null;
+
+            return false;
         }
 
-        return AssetDeleteResult.DidNotDelete;
-    }
+        private static AssetDeleteResult OnWillDeleteAsset(string assetPath, RemoveAssetOptions _)
+        {
+            if (TryGetAssetInfo(assetPath, out var _))
+            {
+                EditorUtility.DisplayDialog(
+                    "Deletion Failed",
+                    "This scriptable object may not be deleted as it is protected by the EnsureAssetExists attribute.",
+                    "Ok"
+                );
 
-    // "Pollyfill" for AssetDatabase.AssetExists (added in Unity 6)
-    private static bool AssetExists(string name, string folder)
-    {
-        var assets = AssetDatabase.FindAssets(
-            name, 
-            new string[] { folder }
-        );
+                return AssetDeleteResult.FailedDelete;
+            }
 
-        return assets.Length > 0;
+            return AssetDeleteResult.DidNotDelete;
+        }
+
+        private static AssetMoveResult OnWillMoveAsset(string sourcePath, string _)
+        {
+            if (TryGetAssetInfo(sourcePath, out var assetInfo) && !assetInfo.Value.movable)
+            {
+                EditorUtility.DisplayDialog(
+                    "Move Failed",
+                    "This scriptable object may not be moved as it is protected by the EnsureAssetExists attribute.",
+                    "Ok"
+                );
+
+                return AssetMoveResult.FailedMove;
+            }
+
+            return AssetMoveResult.DidNotMove;
+        }
     }
 }
