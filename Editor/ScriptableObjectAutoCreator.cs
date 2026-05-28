@@ -60,6 +60,16 @@ namespace ZaurzoUtil
                     var attr = type.GetCustomAttribute<EnsureAssetExistsAttribute>();
                     if (attr == null) continue;
 
+                    if (type.GetCustomAttribute<CreateAssetMenuAttribute>() != null && !existingAssets.Contains(type))
+                    {
+                        Debug.LogWarning(
+                            $"ScriptableObject ({type.Name}) with EnsureAssetExists attribute also has CreateAssetMenu attribute. " +
+                            "Auto-creation will be disabled in this case."
+                        );
+
+                        continue;
+                    }
+
                     string assetFolder = attr.initialFolder;
                     string assetName = attr.initialName ?? type.Name;
 
@@ -79,14 +89,6 @@ namespace ZaurzoUtil
                     );
 
                     cachedAssetInfo.Add(assetInfo);
-
-                    if (type.GetCustomAttribute<CreateAssetMenuAttribute>() != null && !existingAssets.Contains(type))
-                    {
-                        Debug.LogWarning(
-                            $"ScriptableObject ({type.Name}) with EnsureAssetExists attribute also has CreateAssetMenu attribute." +
-                            "Auto-creation will be disabled in this case."
-                        );
-                    }
                 }
             }
 
@@ -105,7 +107,10 @@ namespace ZaurzoUtil
                     // Safegaurd
                     if (currentAssetType != null && currentAssetType != asset.type)
                     {
-                        Debug.LogError($"Cannot auto-create ScriptableObject: A different type of asset already exists at '{asset.path}'");
+                        Debug.LogError(
+                            "Cannot auto-create ScriptableObject: " +
+                            $"A different type of asset already exists at '{asset.path}'"
+                        );
                    
                         return;
                     }
