@@ -2,7 +2,7 @@
 
 namespace Zaurzo.ScriptableObjects
 {
-    [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = true)]
+    [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
     public sealed class AutoCreateAssetAttribute : Attribute
     {
         /// <summary>
