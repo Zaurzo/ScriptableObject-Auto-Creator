@@ -5,7 +5,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
-namespace Zaurzo.ScriptableObjects
+namespace SOAutoCreator
 {
     [InitializeOnLoad]
     static class AutoCreator

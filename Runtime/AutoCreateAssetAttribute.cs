@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Zaurzo.ScriptableObjects
+namespace SOAutoCreator
 {
     [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
     public sealed class AutoCreateAssetAttribute : Attribute
