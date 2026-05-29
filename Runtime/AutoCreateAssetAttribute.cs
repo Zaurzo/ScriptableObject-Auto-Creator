@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace ZaurzoUtil
+namespace Zaurzo.ScriptableObjects
 {
-    [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
-    public sealed class EnsureAssetExistsAttribute : Attribute
+    [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = true)]
+    public sealed class AutoCreateAssetAttribute : Attribute
     {
         /// <summary>
         /// The folder of which this asset will be created in.
@@ -15,10 +15,5 @@ namespace ZaurzoUtil
         /// Defaults to the name of the type.
         /// </summary>
         public string initialName;
-
-        /// <summary>
-        /// Determines if the asset can be moved to a different directory.
-        /// </summary>
-        public bool movable = true;
     }
 }
