@@ -10,19 +10,21 @@ namespace SOAutoCreator
     [InitializeOnLoad]
     static class AutoCreator
     {
-        private readonly static Type ScriptableObjectType = typeof(ScriptableObject);
+        private static readonly Type ScriptableObjectType = typeof(ScriptableObject);
 
         static AutoCreator()
         {
-            Create();
+            CreateMissingAssets();
         }
 
-        [MenuItem("Assets/ScriptableObject/Run Auto Creator")]
-        private static void Create()
+        [MenuItem("Assets/Scriptable Object/Auto Creator/Create Missing Assets")]
+        private static void CreateMissingAssets(MenuCommand command = null)
         {
-            HashSet<Type> existingAssetTypes = GetAllUniqueScriptableObjects();
+            HashSet<Type> existingAssetTypes = GetScriptableObjectTypes();
 
             bool refresh = false;
+
+            int count = 0;
 
             foreach (Type type in TypeCache.GetTypesWithAttribute<AutoCreateAssetAttribute>())
             {
@@ -79,6 +81,7 @@ namespace SOAutoCreator
                     AssetDatabase.CreateAsset(obj, assetPath);
 
                     refresh = true;
+                    count++;
                 }
                 catch (Exception e)
                 {
@@ -90,9 +93,30 @@ namespace SOAutoCreator
             {
                 AssetDatabase.Refresh();
             }
+
+            if (command == null) return;
+
+            string text;
+
+            if (count == 1)
+            {
+                text = "Created 1 scriptable object with a type that has the AutoCreateAsset attribute.";
+            }
+            else
+            {
+                text = $"Created {count} scriptable objects with types that have the AutoCreateAsset attribute.";
+            }
+
+            EditorWindow.focusedWindow.ShowNotification(
+                new GUIContent(text),
+                2.0f
+            );
         }
 
-        private static HashSet<Type> GetAllUniqueScriptableObjects()
+        /// <summary>
+        /// Returns a hash set of all the unique types of scriptable objects in the asset database.
+        /// </summary>
+        private static HashSet<Type> GetScriptableObjectTypes()
         {
             var set = new HashSet<Type>();
 
